@@ -62,10 +62,11 @@ importFile.onchange = (e) => {
         }
       }
       
-      // 保存配置
+      // 保存配置，确保启用高亮
       const configToSave = {
         keywords: data.keywords,
-        caseSensitive: data.caseSensitive || false
+        caseSensitive: data.caseSensitive || false,
+        isHighlightEnabled: true // 确保导入后高亮功能被启用
       };
       
       chrome.storage.local.set(configToSave, () => {
@@ -77,11 +78,20 @@ importFile.onchange = (e) => {
           // 通知所有标签页更新高亮
           chrome.tabs.query({}, (tabs) => {
             tabs.forEach(tab => {
-              chrome.tabs.sendMessage(tab.id, { type: 'UPDATE_HIGHLIGHT' }).catch(() => {
-                // 忽略无法发送消息的标签页（如新标签页）
-              });
+              try {
+                chrome.tabs.sendMessage(tab.id, { type: 'UPDATE_HIGHLIGHT' }, (response) => {
+                  // 处理响应（如果有）
+                  const lastError = chrome.runtime.lastError;
+                  // 忽略无法发送消息的标签页错误
+                });
+              } catch (e) {
+                // 忽略无法发送消息的标签页
+              }
             });
           });
+          
+          // 更新UI显示
+          updateKeywordsList();
         }
       });
       
@@ -243,6 +253,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
+
+// 更新关键词列表显示
+function updateKeywordsList() {
+  // 获取当前配置
+  chrome.storage.local.get(['keywords', 'caseSensitive'], (data) => {
+    // 更新配置状态显示
+    const configInfo = document.querySelector('.version-info');
+    if (configInfo) {
+      configInfo.innerHTML = `
+        <h4>📊 当前配置状态</h4>
+        <ul class="feature-list">
+          <li>已保存 ${data.keywords ? data.keywords.length : 0} 个高亮关键词</li>
+          <li>大小写敏感：${data.caseSensitive ? '开启' : '关闭'}</li>
+          <li>配置已自动保存到浏览器本地存储</li>
+        </ul>
+      `;
+    }
+  });
+}
 
 // 添加键盘快捷键支持
 document.addEventListener('keydown', (e) => {

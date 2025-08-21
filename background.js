@@ -12,7 +12,43 @@ chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
     // 设置默认配置
     const defaultConfig = {
-      keywords: [],
+      keywords: [
+        { id: "1", text: "拒单联系运营 不要发末单", color: "#ff4500", enabled: true },
+        { id: "2", text: "客人取消订单的话麻烦先通知运营BD，不要直接发取消", color: "#ff4500", enabled: true },
+        { id: "3", text: "任何状态下取消一定要钉钉运营", color: "#ff4500", enabled: true },
+        { id: "4", text: "hktuyitrip", color: "#ff4500", enabled: true },
+        { id: "5", text: "发单时同步【发卡】", color: "#ffff00", enabled: true },
+        { id: "6", text: "heytripgo", color: "#ff4500", enabled: true },
+        { id: "7", text: "酒店说满房先不要直接关后台的房，告知运营即可！！！", color: "#ff0000", enabled: true },
+        { id: "8", text: "应付日期", color: "#a020f0", enabled: true },
+        { id: "9", text: "酒店拒单就不用发取消了，直接关单就行", color: "#ff8000", enabled: true },
+        { id: "10", text: "需要保密", color: "#a020f0", enabled: true },
+        { id: "11", text: "未确认的逾时或者取消 请备注unconfirmed发取消单", color: "#ffff00", enabled: true },
+        { id: "12", text: "M3", color: "#ff1493", enabled: true },
+        { id: "13", text: "限时取消", color: "#ff1493", enabled: true },
+        { id: "14", text: "不需要关房，不需要关房", color: "#ff4500", enabled: true },
+        { id: "15", text: "One Bedroom Upper Garden Suite", color: "#ffff00", enabled: true },
+        { id: "16", text: "不用帮运营关房", color: "#ff4500", enabled: true },
+        { id: "17", text: "被拒单后不用关房", color: "#ff4500", enabled: true },
+        { id: "18", text: "付款链接", color: "#a020f0", enabled: true },
+        { id: "19", text: "confirmation number", color: "#00ff00", enabled: true },
+        { id: "20", text: "before", color: "#ff8000", enabled: true },
+        { id: "21", text: "cf#", color: "#00ff00", enabled: true },
+        { id: "22", text: "xiwantrip", color: "#ff4500", enabled: true },
+        { id: "23", text: "hotel number", color: "#00ff00", enabled: true },
+        { id: "24", text: "confirmation no", color: "#00ff00", enabled: true },
+        { id: "25", text: "RSV#", color: "#00ff00", enabled: true },
+        { id: "26", text: "number reservation", color: "#00ff00", enabled: true },
+        { id: "27", text: "HCN", color: "#00ff00", enabled: true },
+        { id: "28", text: "Hotel Confirmation", color: "#00ff00", enabled: true },
+        { id: "29", text: "Hotel number", color: "#00ff00", enabled: true },
+        { id: "30", text: "reservation number", color: "#00ff00", enabled: true },
+        { id: "31", text: "confirmation code", color: "#00ff00", enabled: true },
+        { id: "32", text: "Confirmation number", color: "#00ff00", enabled: true },
+        { id: "33", text: "保密渠道", color: "#a020f0", enabled: true },
+        { id: "34", text: "渠道保密", color: "#a020f0", enabled: true },
+        { id: "35", text: "付款日期", color: "#a020f0", enabled: true }
+      ],
       caseSensitive: false,
       isHighlightEnabled: true,
       firstInstall: true
@@ -75,6 +111,12 @@ function isLightColor(hex) {
 
 // 在页面中切换多重高亮面板的函数
 function toggleMultiHighlightPanel() {
+  // 检查是否已存在面板
+  if (document.getElementById('multi-highlight-panel')) {
+    document.getElementById('multi-highlight-panel').remove();
+    return;
+  }
+  
   // 颜色配置
   const highlightColors = [
     '#ffff00', // 鲜艳黄
@@ -207,8 +249,23 @@ function toggleMultiHighlightPanel() {
       <div id="color-circle-panel" class="color-btn" tabindex="0" title="选择颜色"></div>
       <button id="add-keyword" style="background: #e09f3e; color: #fff; border: none; border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 13px; transition: all 0.2s;">添加</button>
     </div>
-    <div style="margin-bottom: 10px; font-size: 14px;">
+    <div style="margin-bottom: 10px; font-size: 14px; display:flex; align-items:center; gap:12px;">
       <label><input type="checkbox" id="case-sensitive"> 区分大小写</label>
+      <label style="display:flex; align-items:center; gap:6px;">
+        <div id="color-filter-circle" class="color-btn small" style="border: 1px solid black;" title="选择筛选颜色（全部）"></div>
+        颜色筛选
+        <select id="color-filter" style="display:none;">
+          <option value="">全部</option>
+          ${highlightColors.map(c => `<option value="${c}">${c}</option>`).join('')}
+        </select>
+      </label>
+      </div>
+    <div id="search-section" style="display:none; background:#fff; border:1px solid #ffe066; border-radius:6px; padding:8px 10px; margin: 0 0 10px 0;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+        <span style="color:#e09f3e; font-size:12px;">搜索结果</span>
+        <button id="clear-search" style="border:none; background:transparent; color:#e09f3e; cursor:pointer; font-size:12px;">清除</button>
+      </div>
+      <ul id="search-result-list" style="list-style:none; padding:0; margin:0; max-height:120px; overflow-y:auto;"></ul>
     </div>
     <ul id="keyword-list" style="list-style: none; padding: 0; margin: 0 0 12px 0; max-height: 160px; overflow-y: auto;"></ul>
     <div style="display: flex; gap: 8px; justify-content: flex-end;">
@@ -246,11 +303,18 @@ function toggleMultiHighlightPanel() {
   const keywordInput = panel.querySelector('#keyword-input');
   const colorCirclePanel = panel.querySelector('#color-circle-panel');
   const addBtn = panel.querySelector('#add-keyword');
+  // 删除：const searchBtn = panel.querySelector('#search-keyword');
   const keywordList = panel.querySelector('#keyword-list');
+  const searchSection = panel.querySelector('#search-section');
+  const searchResultList = panel.querySelector('#search-result-list');
+  const clearSearchBtn = panel.querySelector('#clear-search');
   const guideBtn = panel.querySelector('#guide-btn');
   const exportBtn = panel.querySelector('#export-config');
   const importBtn = panel.querySelector('#import-config');
   const caseSensitive = panel.querySelector('#case-sensitive');
+  // 新增：颜色筛选选择框
+  const colorFilter = panel.querySelector('#color-filter');
+  const colorFilterCircle = panel.querySelector('#color-filter-circle');
   const panelTitle = panel.querySelector('#panel-title');
   const toggleHighlightBtn = panel.querySelector('#toggle-highlight');
   const eyeIcon = panel.querySelector('#eye-icon');
@@ -348,6 +412,87 @@ function toggleMultiHighlightPanel() {
     }, 10);
   }
 
+  // 新增：颜色筛选弹窗（含"全部"）
+  window.showColorFilterPopup = function({ anchor, currentColor, onSelect }) {
+    // 移除已有弹窗
+    document.querySelectorAll('.color-popup').forEach(p => p.remove());
+    // 创建弹窗
+    const popup = document.createElement('div');
+    popup.className = 'color-popup';
+    popup.style.cssText = `
+      position: fixed;
+      z-index: 2147483647;
+      background: #fff;
+      border: 1px solid #e09f3e;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      padding: 8px 10px;
+      display: flex;
+      gap: 4px;
+      flex-wrap: nowrap;
+      white-space: nowrap;
+    `;
+
+    // “全部”按钮（清空筛选）
+    const allBtn = document.createElement('div');
+    allBtn.className = 'color-btn small';
+    allBtn.title = '全部';
+    allBtn.style.background = 'repeating-linear-gradient(45deg, #f5f5f5 0px, #f5f5f5 6px, #ffffff 6px, #ffffff 12px)';
+    allBtn.style.cursor = 'pointer';
+    allBtn.style.pointerEvents = 'auto';
+    if (!currentColor) allBtn.classList.add('active');
+    allBtn.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      onSelect('');
+      popup.remove();
+    });
+    popup.appendChild(allBtn);
+
+    // 颜色按钮
+    highlightColors.forEach(color => {
+      const btn = document.createElement('div');
+      btn.className = 'color-btn small';
+      btn.style.background = color;
+      btn.title = color;
+      btn.style.cursor = 'pointer';
+      btn.style.pointerEvents = 'auto';
+      if (color === currentColor) btn.classList.add('active');
+      btn.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        onSelect(color);
+        popup.remove();
+      });
+      popup.appendChild(btn);
+    });
+
+    // 挂载并定位
+    document.body.appendChild(popup);
+    const rect = anchor.getBoundingClientRect();
+    const popupRect = popup.getBoundingClientRect();
+    let left = rect.left + window.scrollX;
+    let top = rect.bottom + 4 + window.scrollY;
+    if (left + popupRect.width > window.innerWidth - 10) left = window.innerWidth - popupRect.width - 10;
+    if (top + popupRect.height > window.innerHeight - 10) {
+      top = rect.top - popupRect.height - 4 + window.scrollY;
+      if (top < 10) top = 10;
+    }
+    popup.style.left = left + 'px';
+    popup.style.top = top + 'px';
+
+    // 点击其他地方关闭弹窗
+    setTimeout(() => {
+      const close = (e) => {
+        if (!popup.contains(e.target) && !anchor.contains(e.target)) {
+          popup.remove();
+          document.removeEventListener('mousedown', close);
+        }
+      };
+      document.addEventListener('mousedown', close);
+    }, 10);
+  }
+
   // 主色按钮
   colorCirclePanel.style.background = selectedColor;
   colorCirclePanel.style.zIndex = 2147483647;
@@ -377,11 +522,64 @@ function toggleMultiHighlightPanel() {
     }
   });
 
+  // 新增：颜色筛选圆形按钮逻辑
+  if (colorFilterCircle) {
+    const updateCircleStyle = () => {
+      const val = colorFilter ? colorFilter.value : '';
+      if (val) {
+        colorFilterCircle.style.background = val;
+        colorFilterCircle.style.border = '1px solid rgba(0,0,0,0.15)';
+        colorFilterCircle.title = `选择筛选颜色（${val}）`;
+      } else {
+        colorFilterCircle.style.background = 'repeating-linear-gradient(45deg, #f5f5f5 0px, #f5f5f5 6px, #ffffff 6px, #ffffff 12px)';
+        colorFilterCircle.style.border = '1px dashed #ccc';
+        colorFilterCircle.title = '选择筛选颜色（全部）';
+      }
+    };
+    // 初始化
+    updateCircleStyle();
+
+    colorFilterCircle.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const current = colorFilter ? colorFilter.value : '';
+      showColorFilterPopup({
+        anchor: colorFilterCircle,
+        currentColor: current,
+        onSelect: (val) => {
+          if (colorFilter) colorFilter.value = val || '';
+          updateCircleStyle();
+          renderKeywordList();
+          renderSearchResults(keywordInput.value.trim());
+        }
+      });
+    });
+    colorFilterCircle.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        colorFilterCircle.click();
+      }
+    });
+
+    // 让隐藏的select变化也能同步圆形按钮样式
+    if (colorFilter) {
+      const origOnChange = colorFilter.onchange;
+      colorFilter.onchange = (ev) => {
+        if (origOnChange) origOnChange.call(colorFilter, ev);
+        updateCircleStyle();
+      };
+    }
+  }
   // 渲染关键词列表
   function renderKeywordList() {
     keywordList.innerHTML = '';
     keywords.forEach((item, idx) => {
+      // 颜色过滤：若选择了颜色，仅显示对应颜色的关键词
+      const filterColor = colorFilter ? colorFilter.value : '';
+      if (filterColor && item.color !== filterColor) return;
+
       const li = document.createElement('li');
+      li.dataset.index = idx;
       li.style.cssText = 'display: flex; align-items: center; justify-content: space-between; background: #fff; border: 1px solid #ffe066; border-radius: 4px; margin-bottom: 6px; padding: 4px 8px;';
 
       // 列表颜色按钮
@@ -427,7 +625,7 @@ function toggleMultiHighlightPanel() {
         padding: 2px 4px;
         border-radius: 2px;
         background: ${item.color};
-        color: ${isLightColor(item.color) ? '#222' : '#fff'};
+        color: ${(item.color === '#ffff00' || item.color === '#00ff00' || item.color === '#00e5ff' || item.color === '#00ffd0') ? '#000' : '#fff'};
         box-shadow: 0 0 2px 1px ${hexToRgba(item.color, 0.8)}, 0 0 4px 2px ${hexToRgba(item.color, 0.5)};
         transition: all 0.2s;
         white-space: nowrap;
@@ -514,6 +712,56 @@ function toggleMultiHighlightPanel() {
 
       textContainer.appendChild(textSpan);
 
+      // 创建可见性切换按钮
+      const visibilityBtn = document.createElement('button');
+      const isVisible = item.visible !== false;
+      visibilityBtn.innerHTML = isVisible ? 
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>' : 
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle><line x1="1" y1="1" x2="23" y2="23"></line></svg>';
+      visibilityBtn.title = isVisible ? '点击隐藏高亮' : '点击显示高亮';
+      visibilityBtn.style.cssText = `background: none; border: none; color: ${isVisible ? '#e09f3e' : '#999'}; cursor: pointer; font-size: 16px; margin-right: 4px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;`;
+      visibilityBtn.onclick = function(e) {
+        e.stopPropagation();
+        try {
+          // 获取当前关键词的最新状态
+          chrome.storage.local.get(['keywords'], function(data) {
+            const currentKeywords = data.keywords || [];
+            if (currentKeywords[idx]) {
+              // 切换可见性
+              const newVisibility = currentKeywords[idx].visible === false ? true : false;
+              currentKeywords[idx].visible = newVisibility;
+              
+              // 立即更新按钮外观
+              const isVisible = newVisibility;
+              visibilityBtn.innerHTML = isVisible ? 
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>' : 
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle><line x1="1" y1="1" x2="23" y2="23"></line></svg>';
+              visibilityBtn.title = isVisible ? '点击隐藏高亮' : '点击显示高亮';
+              visibilityBtn.style.color = isVisible ? '#e09f3e' : '#999';
+              
+              // 保存更新后的关键词
+              chrome.storage.local.set({ keywords: currentKeywords }, function() {
+                // 通知内容脚本更新高亮
+                chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+                  if (tabs && tabs[0]) {
+                    chrome.tabs.sendMessage(tabs[0].id, {
+                      type: 'UPDATE_HIGHLIGHT',
+                      keywords: currentKeywords
+                    });
+                  }
+                  // 更新全局变量
+                  keywords = currentKeywords;
+                  // 重新渲染关键词列表
+                  renderKeywordList();
+                });
+              });
+            }
+          });
+        } catch (err) {
+          console.error('处理眼睛按钮点击时出错:', err);
+        }
+      };
+      
       const removeBtn = document.createElement('button');
       removeBtn.textContent = '×';
       removeBtn.style.cssText = 'background: none; border: none; color: #e09f3e; cursor: pointer; font-size: 16px;';
@@ -526,9 +774,67 @@ function toggleMultiHighlightPanel() {
 
       li.appendChild(colorBtn);
       li.appendChild(textContainer);
+      li.appendChild(visibilityBtn);
       li.appendChild(removeBtn);
       keywordList.appendChild(li);
     });
+  }
+
+  // 搜索渲染函数（修复未定义）
+  function renderSearchResults(term) {
+    const q = term || '';
+    const t = q.trim();
+    if (!t) {
+      searchSection.style.display = 'none';
+      searchResultList.innerHTML = '';
+      return;
+    }
+    const isCase = !!caseSensitive.checked;
+    const needle = isCase ? t : t.toLowerCase();
+    const filterColor = colorFilter ? colorFilter.value : '';
+    const results = keywords
+      .map((k, idx) => ({ k, idx }))
+      .filter(({ k }) => (isCase ? k.text.includes(needle) : k.text.toLowerCase().includes(needle)))
+      .filter(({ k }) => !filterColor || k.color === filterColor);
+
+    searchResultList.innerHTML = '';
+    results.forEach(({ k, idx }) => {
+      const li = document.createElement('li');
+      li.style.cssText = 'display:flex; align-items:center; justify-content:space-between; background:#fff; border:1px dashed #ffe066; border-radius:4px; margin-bottom:6px; padding:4px 8px;';
+
+      const colorDot = document.createElement('div');
+      colorDot.className = 'color-btn small';
+      colorDot.style.background = k.color;
+      colorDot.style.marginRight = '8px';
+
+      const textSpan = document.createElement('span');
+      textSpan.textContent = k.text;
+      textSpan.style.cssText = 'flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;';
+
+      const goBtn = document.createElement('button');
+      goBtn.textContent = '定位';
+      goBtn.style.cssText = 'background:#fff; color:#e09f3e; border:1px solid #e09f3e; border-radius:4px; padding:2px 6px; cursor:pointer; font-size:12px;';
+      goBtn.onclick = () => {
+        const target = keywordList.querySelector(`li[data-index="${idx}"]`);
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          const oldOutline = target.style.outline;
+          target.style.outline = '2px solid #e09f3e';
+          setTimeout(() => { target.style.outline = oldOutline || ''; }, 1200);
+        }
+      };
+
+      const left = document.createElement('div');
+      left.style.cssText = 'display:flex; align-items:center; gap:8px; flex:1; min-width:0;';
+      left.appendChild(colorDot);
+      left.appendChild(textSpan);
+
+      li.appendChild(left);
+      li.appendChild(goBtn);
+      searchResultList.appendChild(li);
+    });
+
+    searchSection.style.display = results.length ? 'block' : 'none';
   }
 
   // 保存配置
@@ -552,23 +858,89 @@ function toggleMultiHighlightPanel() {
     const text = keywordInput.value.trim();
     if (!text) return alert('请输入关键词');
     if (keywords.some(k => k.text === text)) return alert('已存在该关键词');
-    keywords.push({ text, color: selectedColor });
+    keywords.push({ text, color: selectedColor, visible: true });
     keywordInput.value = '';
     saveConfig();
     renderKeywordList();
+    renderSearchResults('');
   };
+
+  // 搜索关键词
+  // 移除搜索按钮点击绑定
+  // if (searchBtn) {
+  //   searchBtn.onclick = () => {
+  //     renderSearchResults(keywordInput.value.trim());
+  //   };
+  // }
+  // 搜索相关：仅保留清除按钮（输入事件触发即时检索）
+  if (clearSearchBtn) {
+    clearSearchBtn.onclick = () => {
+      keywordInput.value = '';
+      renderSearchResults('');
+    };
+  }
+  // 事件委托兜底：仅处理清除按钮
+  panel.addEventListener('click', (e) => {
+    const clearTrigger = e.target.closest('#clear-search');
+    if (clearTrigger) {
+      e.preventDefault();
+      keywordInput.value = '';
+      renderSearchResults('');
+    }
+  });
 
   // 其他事件绑定
   caseSensitive.onchange = () => {
     saveConfig();
+    // 搜索结果根据大小写设置实时更新
+    renderSearchResults(keywordInput.value.trim());
   };
 
-  // 确保主输入框的复制粘贴快捷键正常工作
+  // 新增：颜色筛选变更时刷新列表与搜索结果，并根据所选颜色调整下拉背景/文字色
+  if (colorFilter) {
+    const applyFilterStyle = () => {
+      const val = colorFilter.value;
+      if (val) {
+        colorFilter.style.background = val;
+        // 指定的几个颜色使用黑色字体，其余使用白色
+        if (val === '#ffff00' || val === '#00ff00' || val === '#00e5ff' || val === '#00ffd0') {
+          colorFilter.style.color = '#000';
+        } else {
+          colorFilter.style.color = '#fff';
+        }
+      } else {
+        colorFilter.style.background = '#fff';
+        colorFilter.style.color = '#333';
+      }
+    };
+    colorFilter.onchange = () => {
+      applyFilterStyle();
+      renderKeywordList();
+      renderSearchResults(keywordInput.value.trim());
+    };
+    // 初始化一次样式
+    applyFilterStyle();
+  }
+  // 确保主输入框的复制粘贴快捷键正常工作 + 回车=添加关键词
   keywordInput.addEventListener('keydown', (e) => {
+    // 正在中文等输入法组合输入时不响应
+    if (e.isComposing) return;
+
+    // 回车键等同于点击“添加”按钮
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (addBtn) addBtn.click();
+      return;
+    }
+
     // 允许复制粘贴快捷键正常工作
     if (e.ctrlKey || e.metaKey) {
       return; // 不阻止 Ctrl/Cmd 组合键
     }
+  });
+  // 输入联动自动检索
+  keywordInput.addEventListener('input', () => {
+    renderSearchResults(keywordInput.value.trim());
   });
 
   // 确保主输入框支持右键菜单
@@ -658,7 +1030,6 @@ function toggleMultiHighlightPanel() {
       eyeIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="12" rx="8" ry="5.5"/><circle cx="12" cy="12" r="2.5" fill="#aaa"/><line x1="4" y1="20" x2="20" y2="4" stroke="#aaa" stroke-width="2"/></svg>`;
     }
   }
-}
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === 'add-highlight' && info.selectionText) {
@@ -678,20 +1049,42 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     
     chrome.storage.local.get(['keywords'], (data) => {
       const keywords = data.keywords || [];
+      // 检查是否已存在相同关键词
       if (keywords.some(k => k.text === info.selectionText)) {
-        chrome.tabs.sendMessage(tab.id, { type: 'UPDATE_HIGHLIGHT' });
+        // 如果已存在，显示通知
+        try {
+          if (tab && tab.id) {
+            chrome.tabs.sendMessage(tab.id, {
+              type: 'SHOW_NOTIFICATION',
+              message: `关键词 "${info.selectionText}" 已存在`
+            });
+          }
+        } catch (err) {
+          console.error('发送通知消息时出错:', err);
+        }
         return;
       }
       // 自动分配下一个荧光色
       const color = highlightColors[keywords.length % highlightColors.length];
-      keywords.push({ text: info.selectionText, color });
+      keywords.push({ text: info.selectionText, color, visible: true });
       chrome.storage.local.set({ keywords }, () => {
         // 通知所有已打开的页面更新高亮
-        chrome.tabs.query({}, function(tabs) {
-          for (let tab of tabs) {
-            chrome.tabs.sendMessage(tab.id, { type: 'UPDATE_HIGHLIGHT' });
-          }
-        });
+        try {
+          chrome.tabs.query({}, function(tabs) {
+            for (let tab of tabs) {
+              if (tab && tab.id) {
+                chrome.tabs.sendMessage(tab.id, { type: 'UPDATE_HIGHLIGHT' });
+                // 向当前页面发送消息，通知弹窗更新
+                chrome.tabs.sendMessage(tab.id, {
+                  type: 'SHOW_NOTIFICATION',
+                  message: `已添加关键词 "${info.selectionText}"`
+                });
+              }
+            }
+          });
+        } catch (err) {
+          console.error('发送更新高亮消息时出错:', err);
+        }
       });
     });
   }
@@ -712,6 +1105,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: true, tabId: tab.id });
       }
     });
-    return true; // 保持消息通道开放
+return true; // 保持消息通道开放
   }
-}); 
+});
+}
