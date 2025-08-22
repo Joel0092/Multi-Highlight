@@ -845,9 +845,48 @@ function toggleMultiHighlightPanel() {
       isHighlightEnabled: isHighlightEnabled // 保存高亮开关状态
     }, () => {
       // 通知所有已打开的页面更新高亮
-      chrome.tabs.query({}, function(tabs) {
-        for (let tab of tabs) {
-          chrome.tabs.sendMessage(tab.id, { type: 'UPDATE_HIGHLIGHT' });
+      chrome.storage.local.set({ keywords }, () => {
+        if (chrome.runtime.lastError) {
+          console.error('storage.set 保存关键词失败:', chrome.runtime.lastError.message);
+        } else {
+          // 设置扩展图标徽章作为操作反馈
+          try {
+            chrome.action.setBadgeText({ text: '+' });
+            chrome.action.setBadgeBackgroundColor({ color: '#4CAF50' });
+            setTimeout(() => chrome.action.setBadgeText({ text: '' }), 1200);
+          } catch (e) {
+            console.warn('设置徽章提示失败：', e);
+          }
+        }
+        // 通知所有已打开的页面更新高亮
+        try {
+          chrome.tabs.query({}, function(tabs) {
+            for (let tab of tabs) {
+              if (tab && tab.id) {
+                chrome.tabs.sendMessage(tab.id, { type: 'UPDATE_HIGHLIGHT' }, () => {
+                  if (chrome.runtime.lastError) {
+                    console.warn('发送 UPDATE_HIGHLIGHT 失败：', chrome.runtime.lastError.message);
+                  }
+                });
+                chrome.tabs.sendMessage(tab.id, { type: 'POPUP_UPDATE_KEYWORDS' }, () => {
+                  if (chrome.runtime.lastError) {
+                    console.warn('发送 POPUP_UPDATE_KEYWORDS 失败：', chrome.runtime.lastError.message);
+                  }
+                });
+                chrome.tabs.sendMessage(tab.id, {
+                  type: 'SHOW_NOTIFICATION',
+                  message: `已添加关键词 "${selection}"`
+                }, () => {
+                  if (chrome.runtime.lastError) {
+                    // 常见于不可注入的页面（如 chrome:// 或 PDF viewer），仅记录告警
+                    console.warn('发送 SHOW_NOTIFICATION 失败：', chrome.runtime.lastError.message);
+                  }
+                });
+              }
+            }
+          });
+        } catch (err) {
+          console.error('发送更新高亮消息时出错:', err);
         }
       });
     });
@@ -1031,53 +1070,81 @@ function toggleMultiHighlightPanel() {
     }
   }
 
+
+}
+
+// 处理右键菜单点击：添加为高亮（顶层监听器）
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === 'add-highlight' && info.selectionText) {
-    // 颜色配置
-    const highlightColors = [
-      '#ffff00', // 鲜艳黄
-      '#00ff00', // 鲜艳绿
-      '#00e5ff', // 鲜艳蓝
-      '#ff00ff', // 鲜艳粉
-      '#ff8000', // 鲜艳橙
-      '#a020f0', // 鲜艳紫
-      '#00ffd0', // 鲜艳青
-      '#ff0000', // 鲜艳红
-      '#ff1493', // 鲜艳深粉
-      '#ff4500'  // 鲜艳深橙
-    ];
-    
+    const selection = (info.selectionText || '').trim();
+    if (!selection) return;
+
+    // 预通知，便于用户感知和诊断
+    try {
+      if (tab && tab.id) {
+        chrome.tabs.sendMessage(tab.id, { type: 'SHOW_NOTIFICATION', message: `正在添加高亮 "${selection}"` }, () => {
+          if (chrome.runtime.lastError) {
+            console.warn('预通知发送失败：', chrome.runtime.lastError.message);
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('发送预通知异常：', e);
+    }
+
+    const highlightColors = ['#ffff00','#00ff00','#00e5ff','#ff00ff','#ff8000','#a020f0','#00ffd0','#ff0000','#ff1493','#ff4500'];
+
     chrome.storage.local.get(['keywords'], (data) => {
-      const keywords = data.keywords || [];
-      // 检查是否已存在相同关键词
-      if (keywords.some(k => k.text === info.selectionText)) {
-        // 如果已存在，显示通知
+      const keywords = Array.isArray(data.keywords) ? data.keywords : [];
+      if (keywords.some(k => k.text === selection)) {
         try {
           if (tab && tab.id) {
-            chrome.tabs.sendMessage(tab.id, {
-              type: 'SHOW_NOTIFICATION',
-              message: `关键词 "${info.selectionText}" 已存在`
+            chrome.tabs.sendMessage(tab.id, { type: 'SHOW_NOTIFICATION', message: `关键词 "${selection}" 已存在` }, () => {
+              if (chrome.runtime.lastError) {
+                console.warn('发送“已存在”通知失败：', chrome.runtime.lastError.message);
+              }
             });
           }
         } catch (err) {
-          console.error('发送通知消息时出错:', err);
+          console.error('发送“已存在”通知时出错:', err);
         }
         return;
       }
-      // 自动分配下一个荧光色
+
       const color = highlightColors[keywords.length % highlightColors.length];
-      keywords.push({ text: info.selectionText, color, visible: true });
+      keywords.push({ id: Date.now().toString(), text: selection, color, visible: true, caseSensitive: false, wholeWord: false });
+
       chrome.storage.local.set({ keywords }, () => {
-        // 通知所有已打开的页面更新高亮
+        if (chrome.runtime.lastError) {
+          console.error('storage.set 保存关键词失败:', chrome.runtime.lastError.message);
+        } else {
+          try {
+            chrome.action.setBadgeText({ text: '+' });
+            chrome.action.setBadgeBackgroundColor({ color: '#4CAF50' });
+            setTimeout(() => chrome.action.setBadgeText({ text: '' }), 1200);
+          } catch (e) {
+            console.warn('设置徽章提示失败：', e);
+          }
+        }
+
         try {
           chrome.tabs.query({}, function(tabs) {
-            for (let tab of tabs) {
-              if (tab && tab.id) {
-                chrome.tabs.sendMessage(tab.id, { type: 'UPDATE_HIGHLIGHT' });
-                // 向当前页面发送消息，通知弹窗更新
-                chrome.tabs.sendMessage(tab.id, {
-                  type: 'SHOW_NOTIFICATION',
-                  message: `已添加关键词 "${info.selectionText}"`
+            for (let t of tabs) {
+              if (t && t.id) {
+                chrome.tabs.sendMessage(t.id, { type: 'UPDATE_HIGHLIGHT' }, () => {
+                  if (chrome.runtime.lastError) {
+                    console.warn('发送 UPDATE_HIGHLIGHT 失败：', chrome.runtime.lastError.message);
+                  }
+                });
+                chrome.tabs.sendMessage(t.id, { type: 'POPUP_UPDATE_KEYWORDS' }, () => {
+                  if (chrome.runtime.lastError) {
+                    console.warn('发送 POPUP_UPDATE_KEYWORDS 失败：', chrome.runtime.lastError.message);
+                  }
+                });
+                chrome.tabs.sendMessage(t.id, { type: 'SHOW_NOTIFICATION', message: `已添加关键词 "${selection}"` }, () => {
+                  if (chrome.runtime.lastError) {
+                    console.warn('发送 SHOW_NOTIFICATION 失败：', chrome.runtime.lastError.message);
+                  }
                 });
               }
             }
@@ -1090,22 +1157,34 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   }
 });
 
-// 处理来自content script的消息
+// 顶层消息监听：打开设置页
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === 'OPEN_OPTIONS_PAGE') {
-    // 打开设置页面
-    chrome.tabs.create({
-      url: chrome.runtime.getURL('options.html')
-    }, (tab) => {
+  if (message && message.type === 'OPEN_OPTIONS_PAGE') {
+    chrome.tabs.create({ url: chrome.runtime.getURL('options.html') }, (tab) => {
       if (chrome.runtime.lastError) {
         console.error('打开设置页面失败:', chrome.runtime.lastError);
-        sendResponse({ success: false, error: chrome.runtime.lastError.message });
+        try { sendResponse({ success: false, error: chrome.runtime.lastError.message }); } catch (_) {}
       } else {
-        console.log('设置页面已打开，标签页ID:', tab.id);
-        sendResponse({ success: true, tabId: tab.id });
+        console.log('设置页面已打开，标签页ID:', tab && tab.id);
+        try { sendResponse({ success: true, tabId: tab && tab.id }); } catch (_) {}
       }
     });
-return true; // 保持消息通道开放
+    return true; // 异步响应
   }
 });
-}
+
+
+// 确保浏览器启动或服务工作线程唤醒后右键菜单存在（MV3中建议在启动时创建/恢复）
+chrome.runtime.onStartup.addListener(() => {
+  try {
+    chrome.contextMenus.removeAll(() => {
+      chrome.contextMenus.create({
+        id: 'add-highlight',
+        title: '添加为高亮',
+        contexts: ['selection']
+      });
+    });
+  } catch (e) {
+    console.warn('初始化右键菜单时出错：', e);
+  }
+});
